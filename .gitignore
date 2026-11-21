@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Phone screenshots, recordings and pulled APKs — may contain personal data
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.apk
+screenshots/
+recordings/
+
+# Debug output
+*.log
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
