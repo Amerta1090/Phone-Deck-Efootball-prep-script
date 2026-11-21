@@ -1,80 +1,107 @@
-# Phone Deck
+# eFootball Prep
 
-Small tools for controlling an Android phone (vivo V2157, Android 14) from this laptop over USB debugging.
-Everything runs on plain `adb`; nothing is installed on the phone.
+An adb script that sets up your eFootball tactics before a Division match: it reads the
+opponent and sets your Individual Instructions to counter them.
+
+It **never starts a match**. You press To Match yourself, before and after the script runs.
+
+```
+$ python3 efootball/efootball_prep.py
+Waiting for the pre-match Game Plan…
+  stadium screen → Next
+Reading opponent…
+  Long Ball Counter · ATK 4-3-3 / DEF 4-3-3 · strength 3168
+Setting individual instructions…
+  Defence2: DMF marks their SS 104
+Done. Check the Game Plan, then press To Match yourself.
+```
+
+## Why
+
+Individual Instructions reset for every Division match. Setting four of them by hand,
+including finding the opponent's best playmaker for Man Marking, takes a few minutes of
+tapping through menus. The script does it in about 90 seconds while you watch.
 
 ## Requirements
 
-- `adb` with the phone connected and USB debugging authorised (`adb devices` shows `device`)
-- Python 3 with Pillow
-- For eFootball prep only: `tesseract` with English data (`sudo pacman -S tesseract-data-eng`)
+- An Android phone with **USB debugging** enabled and this computer authorised (`adb devices` shows `device`)
+- `adb`
+- Python 3 with Pillow (`pip install pillow`)
+- Tesseract OCR with English data:
+  - Arch: `sudo pacman -S tesseract tesseract-data-eng`
+  - Debian/Ubuntu: `sudo apt install tesseract-ocr tesseract-ocr-eng`
 
-## What's here
+## Usage
 
-| Path | What it does |
-|---|---|
-| `server.py` + `index.html` | **Phone Deck**: a web dashboard with a live screen mirror, tap/swipe/type control and battery/RAM/storage stats |
-| `restore-bloatware.sh` | Re-enables the vivo apps that were disabled on 2026-11-21 |
-| `efootball/efootball_prep.py` | Sets up eFootball match tactics automatically before a Division match |
-| `efootball/NOTES.md` | eFootball screen map, manager proficiencies, strategy rules and results log |
+1. Open eFootball on the **Division** dashboard.
+2. Press **To Match**.
+3. Run:
+   ```bash
+   python3 efootball/efootball_prep.py
+   ```
+4. When it prints `Done`, check the Game Plan and press **To Match**.
 
-## Phone Deck
+You can start the script before matchmaking finishes. It waits up to 3 minutes for the
+pre-match Game Plan to appear.
 
-```bash
-python3 ~/phone-deck/server.py
+## What it does
+
+1. **Waits** for the pre-match Game Plan. If the stadium/kit screen shows up first, it presses
+   Next on it; that only moves to the Game Plan.
+2. **Reads the opponent** from their team view: attacking and defensive formation,
+   team playstyle and collective strength.
+3. **Sets the Individual Instructions:**
+
+   | Slot | Instruction | Our player | Why |
+   |---|---|---|---|
+   | Attack1 | Anchoring | DMF | Keeps a screen in front of the defence against counters |
+   | Attack2 | Defensive | LB | Three defenders stay back while we attack |
+   | Defence1 | Counter Target | SS (fast forward) | Stays high for the long ball when we win possession |
+   | Defence2 | Man Marking | DMF | Marks their best creator: highest-rated AMF/SS, else CF, else winger, else CMF |
+
+4. **Returns** to the pre-match Game Plan and stops.
+
+## Configuration
+
+The rules are constants at the top of `efootball/efootball_prep.py`. Edit them to match your squad:
+
+```python
+ANCHOR_POS = "DMF"          # Attack1 Anchoring
+DEFENSIVE_POS = "LB"        # Attack2 Defensive
+COUNTER_TARGET_POS = "SS"   # Defence1 Counter Target
+MARKER_POS = "DMF"          # Defence2 Man Marking: who marks
+CREATOR_TIERS = [("AMF", "SS"), ("CF",), ("LWF", "RWF", "LMF", "RMF"), ("CMF",)]
 ```
 
-Open http://127.0.0.1:8765.
+Players are found by the position label on their card, so the script follows
+formation changes as long as each position above exists in your starting XI.
 
-- **Screen:** refreshes about once a second. Click it to tap the phone, drag on it to swipe.
-- **Buttons:** Back, Home, Recents, Wake, Power, Volume ±, Play/Pause.
-- **Text box:** types into whatever field is focused on the phone.
-- **Stats:** battery and charging, temperature, RAM, storage, uptime, screen state and the foreground app.
+## How it works
 
-The server listens on `127.0.0.1` only, so other devices on the network can't reach it.
-For smooth video with sound, use `scrcpy` instead.
+- **Input:** eFootball ignores `adb shell input tap`, so every tap is a 120 ms press
+  (`input swipe X Y X Y 120`).
+- **Coordinates** are defined in a 1280-wide screenshot frame and scaled to the phone.
+  They were mapped on a 2408×1080 screen. Other resolutions may need adjusting.
+- **OCR:** card text is white and boosted ratings are yellow, on colourful player art.
+  The script masks only bright pixels, thickens the strokes and runs Tesseract with tuned
+  settings. On real screenshots it read 30/30 card positions and ratings, and 4/4 opponent
+  formations, playstyles and strengths.
+- **Screen detection** uses pixel probes (pitch green, gear tile, To Match button) plus OCR
+  of the "General Settings" label on the stadium screen.
 
-## eFootball prep
+`efootball/NOTES.md` has the full screen map: every button coordinate, the post-match flow,
+manager playstyle proficiencies, the strategy rules and a results log.
 
-Prepares tactics for a Division match. It **never starts a match**; you press To Match yourself.
+## Limitations
 
-1. Open eFootball on the Division dashboard and press **To Match**.
-2. Run:
-   ```bash
-   python3 ~/phone-deck/efootball/efootball_prep.py
-   ```
-3. When it prints `Done`, check the Game Plan and press **To Match**.
+- Tuned for one device (vivo V2157, 2408×1080) and the game's UI as of November 2026.
+  A UI update can move buttons.
+- It doesn't change formation, manager or team playstyle; those stay as you set them.
+- If something unexpected appears (event pop-up, network error), it exits instead of guessing.
 
-The script:
+## Fair play
 
-1. waits for matchmaking and skips the stadium screen
-2. reads the opponent's formation, playstyle and strength
-3. sets all four Individual Instructions:
-   - Anchoring → DMF
-   - Defensive → LB
-   - Counter Target → SS (Mbappé)
-   - Man Marking: our DMF on their best AMF/SS
-4. stops on the pre-match Game Plan
-
-It takes about 90 seconds.
-
-To change who gets each instruction, edit the constants at the top of `efootball_prep.py`
-(`ANCHOR_POS`, `DEFENSIVE_POS`, `COUNTER_TARGET_POS`, `MARKER_POS`, `CREATOR_TIERS`).
-See `efootball/NOTES.md` for every button's coordinates and the reasoning behind the rules.
-
-> Full match automation (auto-pressing To Match in a loop) was deliberately left out.
-> Division is ranked online play, and botting it risks a Konami account ban.
-
-## Changes made to the phone on 2026-11-21
-
-| Change | How to undo |
-|---|---|
-| Animation scales set to 0.5x | Developer options → the three animation scales → 1x |
-| 11 vivo/Facebook preinstalled apps disabled (not uninstalled) | `~/phone-deck/restore-bloatware.sh` |
-| Naruto Storm 3 folder deleted (7 GB) and app caches cleared | Not reversible (the folder held old PS3 game files) |
-
-## Gotchas
-
-- **eFootball ignores `adb shell input tap`.** Use a short press instead: `input swipe X Y X Y 120`.
-- Coordinates in the eFootball notes use a 1280-wide screenshot frame. Multiply by 2408/1280 for real taps.
-- Some phone settings are locked by vivo. V-Appstore, Jovi (hiboard) and vivo website can't be disabled without root.
+This script only automates menu setup that you would otherwise do by hand. Starting matches
+and playing them is left to you and the game. Automating gameplay or looping matches in
+ranked online modes breaks Konami's terms and can get an account banned, so the script
+doesn't do either. Use it at your own risk.

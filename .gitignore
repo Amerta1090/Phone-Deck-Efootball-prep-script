@@ -1,3 +1,11 @@
+# Only the efootball/ folder and its root README are published from this repo.
+# Phone Deck files (server.py, index.html, PHONE-DECK.md, …) stay local.
+# Ignore everything at the top level, then re-include what should be tracked.
+/*
+!/.gitignore
+!/README.md
+!/efootball/
+
 # Python
 __pycache__/
 *.py[cod]
